@@ -33,7 +33,7 @@
     .badge-new { background: #0284c7; color: white; }
     .badge-found { background: #16a34a; color: white; }
     label { display: block; margin-top: 14px; font-weight: 600; color: #cbd5e1; font-size: 0.9rem; }
-    select, input { 
+    select, input[type="number"] { 
       width: 100%; 
       padding: 12px; 
       margin-top: 6px; 
@@ -44,26 +44,33 @@
       font-size: 1rem; 
     }
     select:focus, input:focus { outline: 2px solid #38bdf8; border-color: transparent; }
+    
+    /* STOCK LEVEL BUTTON GRID */
     .status-group {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 8px;
+      display: flex;
+      gap: 10px;
       margin-top: 8px;
+      width: 100%;
     }
     .status-btn {
-      padding: 10px;
-      border: 1px solid #475569;
+      flex: 1;
+      padding: 12px 6px;
+      border: 2px solid #475569;
       background: #0f172a;
       color: #94a3b8;
-      border-radius: 6px;
+      border-radius: 8px;
       font-weight: bold;
+      font-size: 0.95rem;
       cursor: pointer;
       text-align: center;
       user-select: none;
+      transition: all 0.2s ease;
     }
-    .status-btn.selected-Full { background: #16a34a; color: white; border-color: #16a34a; }
-    .status-btn.selected-Low { background: #eab308; color: black; border-color: #eab308; }
-    .status-btn.selected-Empty { background: #dc2626; color: white; border-color: #dc2626; }
+    /* Active Selected States */
+    .status-btn.selected-Full { background: #16a34a !important; color: #ffffff !important; border-color: #22c55e !important; }
+    .status-btn.selected-Low { background: #eab308 !important; color: #000000 !important; border-color: #facc15 !important; }
+    .status-btn.selected-Empty { background: #dc2626 !important; color: #ffffff !important; border-color: #ef4444 !important; }
+
     button[type="submit"] { 
       width: 100%; 
       padding: 14px; 
@@ -88,7 +95,7 @@
   <div id="status-badge" class="badge badge-new">New / Unassigned</div>
 
   <form id="inventory-form">
-    <!-- 1. Location Selection -->
+    <!-- 1. Location -->
     <label for="location">Rack / Shop Location</label>
     <select id="location" required>
       <option value="">-- Select Location --</option>
@@ -111,7 +118,7 @@
       <option value="Galvanized">Galvanized</option>
     </select>
 
-    <!-- 3. Size / Dimensions -->
+    <!-- 3. Size -->
     <label for="size">Dimensions / Size</label>
     <select id="size" required>
       <option value="">-- Select Size --</option>
@@ -121,7 +128,7 @@
       <option value="5' x 12'">5' x 12'</option>
     </select>
 
-    <!-- 4. Thickness / Gauge -->
+    <!-- 4. Thickness -->
     <label for="thickness">Thickness / Gauge</label>
     <select id="thickness" required>
       <option value="">-- Select Thickness --</option>
@@ -139,7 +146,111 @@
     <label for="quantity">Sheet Quantity Remaining <span style="font-weight: normal; font-size: 0.8rem; color: #94a3b8;">(Optional)</span></label>
     <input type="number" id="quantity" min="0" placeholder="e.g. 12">
 
-    <!-- 6. Stock Level Toggle Buttons -->
+    <!-- 6. Stock Level Buttons -->
     <label>Stock Level</label>
     <div class="status-group">
-      <div id="btn-Full" class="status-btn" onclick="setStatus('
+      <button type="button" id="btn-Full" class="status-btn selected-Full" onclick="setStatus('Full')">Full</button>
+      <button type="button" id="btn-Low" class="status-btn" onclick="setStatus('Low')">Low</button>
+      <button type="button" id="btn-Empty" class="status-btn" onclick="setStatus('Empty')">Empty</button>
+    </div>
+    <input type="hidden" id="status" value="Full" required>
+
+    <!-- 7. Save Button -->
+    <button type="submit" id="save-btn">Save to Inventory</button>
+    <div id="message"></div>
+    <div class="updated-text" id="last-updated"></div>
+  </form>
+</div>
+
+<script>
+  // PASTE YOUR GOOGLE APPS SCRIPT WEB APP URL HERE:
+  const SCRIPT_URL = "YOUR_DEPLOYED_GOOGLE_APPS_SCRIPT_URL";
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const cartridgeId = urlParams.get('id');
+
+  if (!cartridgeId) {
+    document.querySelector('.card').innerHTML = "<h2>No Cartridge ID Found</h2><p>Please scan a valid cartridge QR code.</p>";
+  } else {
+    document.getElementById('cartridge-id').innerText = cartridgeId;
+    loadCartridgeData();
+  }
+
+  function setStatus(val) {
+    document.getElementById('status').value = val;
+    ['Full', 'Low', 'Empty'].forEach(s => {
+      const btn = document.getElementById('btn-' + s);
+      if (btn) {
+        btn.className = 'status-btn';
+        if (s === val) {
+          btn.classList.add('selected-' + val);
+        }
+      }
+    });
+  }
+
+  function loadCartridgeData() {
+    setStatus('Full');
+    fetch(`${SCRIPT_URL}?id=${cartridgeId}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.error || !data.material) return;
+        
+        document.getElementById('status-badge').className = "badge badge-found";
+        document.getElementById('status-badge').innerText = "Assigned Cartridge";
+        
+        if (data.location) document.getElementById('location').value = data.location;
+        if (data.material) document.getElementById('material').value = data.material;
+        if (data.size) document.getElementById('size').value = data.size;
+        if (data.thickness) document.getElementById('thickness').value = data.thickness;
+        if (data.quantity !== undefined && data.quantity !== null) {
+          document.getElementById('quantity').value = data.quantity;
+        }
+        if (data.status) setStatus(data.status);
+        if (data.lastUpdated) document.getElementById('last-updated').innerText = "Last updated: " + data.lastUpdated;
+      })
+      .catch(err => console.error("Could not fetch data:", err));
+  }
+
+  document.getElementById('inventory-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('save-btn');
+    const msg = document.getElementById('message');
+    
+    btn.disabled = true;
+    btn.innerText = "Updating Sheet...";
+    msg.innerText = "";
+
+    const payload = {
+      cartridgeId: cartridgeId,
+      location: document.getElementById('location').value,
+      material: document.getElementById('material').value,
+      size: document.getElementById('size').value,
+      thickness: document.getElementById('thickness').value,
+      quantity: document.getElementById('quantity').value !== "" ? document.getElementById('quantity').value : "",
+      status: document.getElementById('status').value
+    };
+
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(data => {
+      msg.style.color = "#4ade80";
+      msg.innerText = "Saved successfully!";
+      btn.disabled = false;
+      btn.innerText = "Save to Inventory";
+      loadCartridgeData();
+    })
+    .catch(err => {
+      msg.style.color = "#f87171";
+      msg.innerText = "Error updating inventory.";
+      btn.disabled = false;
+      btn.innerText = "Save to Inventory";
+    });
+  });
+</script>
+
+</body>
+</html>
