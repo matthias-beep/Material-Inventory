@@ -59,6 +59,7 @@
       font-weight: bold;
       cursor: pointer;
       text-align: center;
+      user-select: none;
     }
     .status-btn.selected-Full { background: #16a34a; color: white; border-color: #16a34a; }
     .status-btn.selected-Low { background: #eab308; color: black; border-color: #eab308; }
@@ -87,6 +88,7 @@
   <div id="status-badge" class="badge badge-new">New / Unassigned</div>
 
   <form id="inventory-form">
+    <!-- 1. Location Selection -->
     <label for="location">Rack / Shop Location</label>
     <select id="location" required>
       <option value="">-- Select Location --</option>
@@ -98,6 +100,7 @@
       <option value="Floor Storage">Floor Storage</option>
     </select>
 
+    <!-- 2. Material Type -->
     <label for="material">Material Type</label>
     <select id="material" required>
       <option value="">-- Select Material --</option>
@@ -108,9 +111,35 @@
       <option value="Galvanized">Galvanized</option>
     </select>
 
+    <!-- 3. Size / Dimensions -->
     <label for="size">Dimensions / Size</label>
     <select id="size" required>
       <option value="">-- Select Size --</option>
       <option value="4' x 8'">4' x 8'</option>
       <option value="4' x 10'">4' x 10'</option>
-      <option value="5' x 10'">5' x 10'
+      <option value="5' x 10'">5' x 10'</option>
+      <option value="5' x 12'">5' x 12'</option>
+    </select>
+
+    <!-- 4. Thickness / Gauge -->
+    <label for="thickness">Thickness / Gauge</label>
+    <select id="thickness" required>
+      <option value="">-- Select Thickness --</option>
+      <option value="20ga">20 ga</option>
+      <option value="16ga">16 ga</option>
+      <option value="14ga">14 ga</option>
+      <option value="11ga">11 ga (1/8")</option>
+      <option value="3/16 inch">3/16"</option>
+      <option value="1/4 inch">1/4"</option>
+      <option value="3/8 inch">3/8"</option>
+      <option value="1/2 inch">1/2"</option>
+    </select>
+
+    <!-- 5. Quantity (Optional) -->
+    <label for="quantity">Sheet Quantity Remaining <span style="font-weight: normal; font-size: 0.8rem; color: #94a3b8;">(Optional)</span></label>
+    <input type="number" id="quantity" min="0" placeholder="e.g. 12">
+
+    <!-- 6. Stock Level Toggle Buttons -->
+    <label>Stock Level</label>
+    <div class="status-group">
+      <div id="btn-Full" class="status-btn" onclick="setStatus('
