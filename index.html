@@ -87,6 +87,17 @@
   <div id="status-badge" class="badge badge-new">New / Unassigned</div>
 
   <form id="inventory-form">
+    <label for="location">Rack / Shop Location</label>
+    <select id="location" required>
+      <option value="">-- Select Location --</option>
+      <option value="Rack A">Rack A</option>
+      <option value="Rack B">Rack B</option>
+      <option value="Rack C">Rack C</option>
+      <option value="Rack D">Rack D</option>
+      <option value="Staging Area">Staging Area</option>
+      <option value="Floor Storage">Floor Storage</option>
+    </select>
+
     <label for="material">Material Type</label>
     <select id="material" required>
       <option value="">-- Select Material --</option>
@@ -137,7 +148,7 @@
 </div>
 
 <script>
-  // 1. PASTE YOUR GOOGLE APPS SCRIPT WEB APP URL HERE:
+  // PASTE YOUR GOOGLE APPS SCRIPT WEB APP URL HERE:
   const SCRIPT_URL = "YOUR_DEPLOYED_GOOGLE_APPS_SCRIPT_URL";
 
   const urlParams = new URLSearchParams(window.location.search);
@@ -161,7 +172,7 @@
   }
 
   function loadCartridgeData() {
-    setStatus('Full'); // default
+    setStatus('Full'); // default status
     fetch(`${SCRIPT_URL}?id=${cartridgeId}`)
       .then(res => res.json())
       .then(data => {
@@ -170,6 +181,7 @@
         document.getElementById('status-badge').className = "badge badge-found";
         document.getElementById('status-badge').innerText = "Assigned Cartridge";
         
+        if (data.location) document.getElementById('location').value = data.location;
         if (data.material) document.getElementById('material').value = data.material;
         if (data.size) document.getElementById('size').value = data.size;
         if (data.thickness) document.getElementById('thickness').value = data.thickness;
@@ -191,6 +203,7 @@
 
     const payload = {
       cartridgeId: cartridgeId,
+      location: document.getElementById('location').value,
       material: document.getElementById('material').value,
       size: document.getElementById('size').value,
       thickness: document.getElementById('thickness').value,
