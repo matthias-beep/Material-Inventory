@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Steel Cartridge Manager</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+      padding: 16px; 
+      max-width: 480px; 
+      margin: 0 auto; 
+      background: #0f172a; 
+      color: #f8fafc;
+    }
+    .card { 
+      background: #1e293b; 
+      padding: 20px; 
+      border-radius: 12px; 
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      border: 1px solid #334155;
+    }
+    h2 { margin-top: 0; color: #38bdf8; font-size: 1.4rem; }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-weight: bold;
+      font-size: 0.85rem;
+      margin-bottom: 12px;
+    }
+    .badge-new { background: #0284c7; color: white; }
+    .badge-found { background: #16a34a; color: white; }
+    label { display: block; margin-top: 14px; font-weight: 600; color: #cbd5e1; font-size: 0.9rem; }
+    select, input { 
+      width: 100%; 
+      padding: 12px; 
+      margin-top: 6px; 
+      background: #0f172a; 
+      color: #f8fafc; 
+      border: 1px solid #475569; 
+      border-radius: 8px; 
+      font-size: 1rem; 
+    }
+    select:focus, input:focus { outline: 2px solid #38bdf8; border-color: transparent; }
+    .status-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .status-btn {
+      padding: 10px;
+      border: 1px solid #475569;
+      background: #0f172a;
+      color: #94a3b8;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      text-align: center;
+    }
+    .status-btn.selected-Full { background: #16a34a; color: white; border-color: #16a34a; }
+    .status-btn.selected-Low { background: #eab308; color: black; border-color: #eab308; }
+    .status-btn.selected-Empty { background: #dc2626; color: white; border-color: #dc2626; }
+    button[type="submit"] { 
+      width: 100%; 
+      padding: 14px; 
+      margin-top: 24px; 
+      background: #0284c7; 
+      color: white; 
+      border: none; 
+      border-radius: 8px; 
+      font-size: 1.1rem; 
+      font-weight: bold; 
+      cursor: pointer; 
+    }
+    button:disabled { background: #475569; cursor: not-allowed; }
+    #message { margin-top: 12px; text-align: center; font-weight: bold; }
+    .updated-text { font-size: 0.75rem; color: #64748b; margin-top: 12px; text-align: center; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h2 id="cartridge-id">Cartridge Manager</h2>
+  <div id="status-badge" class="badge badge-new">New / Unassigned</div>
+
+  <form id="inventory-form">
+    <label for="material">Material Type</label>
+    <select id="material" required>
+      <option value="">-- Select Material --</option>
+      <option value="Mild Steel">Mild Steel</option>
+      <option value="Stainless Steel (304)">Stainless Steel (304)</option>
+      <option value="Stainless Steel (316)">Stainless Steel (316)</option>
+      <option value="Aluminum (6061)">Aluminum (6061)</option>
+      <option value="Galvanized">Galvanized</option>
+    </select>
+
+    <label for="size">Dimensions / Size</label>
+    <select id="size" required>
+      <option value="">-- Select Size --</option>
+      <option value="4' x 8'">4' x 8'</option>
+      <option value="4' x 10'">4' x 10'</option>
+      <option value="5' x 10'">5' x 10'</option>
+      <option value="5' x 12'">5' x 12'</option>
+    </select>
+
+    <label for="thickness">Thickness / Gauge</label>
+    <select id="thickness" required>
+      <option value="">-- Select Thickness --</option>
+      <option value="20ga">20 ga</option>
+      <option value="16ga">16 ga</option>
+      <option value="14ga">14 ga</option>
+      <option value="11ga">11 ga (1/8")</option>
+      <option value="3/16 inch">3/16"</option>
+      <option value="1/4 inch">1/4"</option>
+      <option value="3/8 inch">3/8"</option>
+      <option value="1/2 inch">1/2"</option>
+    </select>
+
+    <label for="quantity">Sheet Quantity Remaining</label>
+    <input type="number" id="quantity" min="0" placeholder="e.g. 12" required>
+
+    <label>Stock Level</label>
+    <div class="status-group">
+      <div class="status-btn" onclick="setStatus('Full')">Full</div>
+      <div class="status-btn" onclick="setStatus('Low')">Low</div>
+      <div class="status-btn" onclick="setStatus('Empty')">Empty</div>
+    </div>
+    <input type="hidden" id="status" value="Full" required>
+
+    <button type="submit" id="save-btn">Save to Inventory</button>
+    <div id="message"></div>
+    <div class="updated-text" id="last-updated"></div>
+  </form>
+</div>
+
+<script>
+  // 1. PASTE YOUR GOOGLE APPS SCRIPT WEB APP URL HERE:
+  const SCRIPT_URL = "YOUR_DEPLOYED_GOOGLE_APPS_SCRIPT_URL";
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const cartridgeId = urlParams.get('id');
+
+  if (!cartridgeId) {
+    document.querySelector('.card').innerHTML = "<h2>No Cartridge ID Found</h2><p>Please scan a valid cartridge QR code.</p>";
+  } else {
+    document.getElementById('cartridge-id').innerText = cartridgeId;
+    loadCartridgeData();
+  }
+
+  function setStatus(val) {
+    document.getElementById('status').value = val;
+    document.querySelectorAll('.status-btn').forEach(btn => {
+      btn.className = 'status-btn';
+      if (btn.innerText === val) {
+        btn.classList.add('selected-' + val);
+      }
+    });
+  }
+
+  function loadCartridgeData() {
+    setStatus('Full'); // default
+    fetch(`${SCRIPT_URL}?id=${cartridgeId}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.error || !data.material) return;
+        
+        document.getElementById('status-badge').className = "badge badge-found";
+        document.getElementById('status-badge').innerText = "Assigned Cartridge";
+        
+        if (data.material) document.getElementById('material').value = data.material;
+        if (data.size) document.getElementById('size').value = data.size;
+        if (data.thickness) document.getElementById('thickness').value = data.thickness;
+        if (data.quantity !== undefined) document.getElementById('quantity').value = data.quantity;
+        if (data.status) setStatus(data.status);
+        if (data.lastUpdated) document.getElementById('last-updated').innerText = "Last updated: " + data.lastUpdated;
+      })
+      .catch(err => console.error("Could not fetch data:", err));
+  }
+
+  document.getElementById('inventory-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('save-btn');
+    const msg = document.getElementById('message');
+    
+    btn.disabled = true;
+    btn.innerText = "Updating Sheet...";
+    msg.innerText = "";
+
+    const payload = {
+      cartridgeId: cartridgeId,
+      material: document.getElementById('material').value,
+      size: document.getElementById('size').value,
+      thickness: document.getElementById('thickness').value,
+      quantity: document.getElementById('quantity').value,
+      status: document.getElementById('status').value
+    };
+
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(data => {
+      msg.style.color = "#4ade80";
+      msg.innerText = "Saved successfully!";
+      btn.disabled = false;
+      btn.innerText = "Save to Inventory";
+      loadCartridgeData();
+    })
+    .catch(err => {
+      msg.style.color = "#f87171";
+      msg.innerText = "Error updating inventory.";
+      btn.disabled = false;
+      btn.innerText = "Save to Inventory";
+    });
+  });
+</script>
+
+</body>
+</html>
