@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Steel Cartridge Manager & Dashboard</title>
+  <!-- HTML5 QR Code Scanner Library -->
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
     * { box-sizing: border-box; }
     body { 
@@ -46,6 +48,25 @@
     }
     select:focus, input:focus { outline: 2px solid #38bdf8; border-color: transparent; }
     
+    /* BUTTON STYLES */
+    .btn-action {
+      width: 100%;
+      padding: 14px;
+      margin-top: 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+      display: block;
+    }
+    .btn-primary { background: #0284c7; color: white; }
+    .btn-secondary { background: #334155; color: white; }
+    .btn-success { background: #16a34a; color: white; }
+    .btn-scan { background: #8b5cf6; color: white; margin-top: 0; margin-bottom: 16px; }
+
     /* STOCK LEVEL BUTTON GRID */
     .status-group {
       display: flex;
@@ -71,26 +92,22 @@
     .status-btn.selected-Low { background: #eab308 !important; color: #000000 !important; border-color: #facc15 !important; }
     .status-btn.selected-Empty { background: #dc2626 !important; color: #ffffff !important; border-color: #ef4444 !important; }
 
-    button[type="submit"], .dash-btn { 
-      width: 100%; 
-      padding: 14px; 
-      margin-top: 24px; 
-      background: #0284c7; 
-      color: white; 
-      border: none; 
-      border-radius: 8px; 
-      font-size: 1.1rem; 
-      font-weight: bold; 
-      cursor: pointer; 
-      text-align: center;
-      text-decoration: none;
-      display: block;
-    }
-    button:disabled { background: #475569; cursor: not-allowed; }
     #message { margin-top: 12px; text-align: center; font-weight: bold; }
     .updated-text { font-size: 0.75rem; color: #64748b; margin-top: 12px; text-align: center; }
 
     /* DASHBOARD STYLES */
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .header-btns {
+      display: flex;
+      gap: 10px;
+    }
     .controls {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -134,12 +151,40 @@
     .status-Full { background: #16a34a; color: white; }
     .status-Low { background: #eab308; color: black; }
     .status-Empty { background: #dc2626; color: white; }
+
+    /* CAMERA MODAL */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.95);
+      z-index: 9999;
+      padding: 20px;
+      text-align: center;
+    }
+    #reader {
+      width: 100%;
+      max-width: 500px;
+      margin: 20px auto;
+      border: 2px solid #38bdf8;
+      border-radius: 12px;
+      overflow: hidden;
+    }
   </style>
 </head>
 <body>
 
+<!-- CAMERA SCANNER MODAL -->
+<div id="scanner-modal" class="modal">
+  <h2 style="color: white;">Scan Cartridge QR Code</h2>
+  <div id="reader"></div>
+  <button type="button" class="btn-action btn-secondary" onclick="stopScanner()" style="max-width: 200px; margin: 10px auto;">Cancel</button>
+</div>
+
 <!-- VIEW 1: SINGLE CARTRIDGE SCANNER FORM -->
 <div id="scanner-view" class="card" style="display: none;">
+  <button type="button" class="btn-action btn-scan" onclick="startScanner()">📷 Scan Another Cartridge</button>
+  
   <h2 id="cartridge-id">Cartridge Manager</h2>
   <div id="status-badge" class="badge badge-new">New / Unassigned</div>
 
@@ -213,17 +258,23 @@
     </div>
     <input type="hidden" id="status" value="Full" required>
 
-    <button type="submit" id="save-btn">Save to Inventory</button>
+    <button type="submit" id="save-btn" class="btn-action btn-primary">Save to Inventory</button>
     <div id="message"></div>
     <div class="updated-text" id="last-updated"></div>
   </form>
-  <a href="/" class="dash-btn" style="background: #334155; margin-top: 16px;">View Full Shop Dashboard</a>
+  <a href="/" class="btn-action btn-secondary">View Full Shop Dashboard</a>
 </div>
 
 
 <!-- VIEW 2: SHOP INVENTORY DASHBOARD -->
 <div id="dashboard-view" style="display: none;">
-  <h1>Steel Inventory Dashboard</h1>
+  <div class="dashboard-header">
+    <h1>Steel Inventory Dashboard</h1>
+    <div class="header-btns">
+      <button type="button" class="btn-action btn-scan" style="width: auto; padding: 10px 16px;" onclick="startScanner()">📷 Scan QR</button>
+      <button type="button" class="btn-action btn-success" style="width: auto; padding: 10px 16px; margin-top: 0;" onclick="exportCSV()">📥 Export CSV</button>
+    </div>
+  </div>
 
   <div class="controls">
     <div>
@@ -262,6 +313,7 @@
   const urlParams = new URLSearchParams(window.location.search);
   const cartridgeId = urlParams.get('id');
   let inventoryData = [];
+  let html5QrCode = null;
 
   // ROUTER LOGIC: If ?id= exists, show scanner form; otherwise show dashboard
   if (cartridgeId) {
@@ -273,143 +325,17 @@
     fetchInventory();
   }
 
-  /* SCANNER FORM FUNCTIONS */
-  function setStatus(val) {
-    document.getElementById('status').value = val;
-    ['Full', 'Low', 'Empty'].forEach(s => {
-      const btn = document.getElementById('btn-' + s);
-      if (btn) {
-        btn.className = 'status-btn';
-        if (s === val) btn.classList.add('selected-' + val);
-      }
-    });
-  }
-
-  function loadCartridgeData() {
-    setStatus('Full');
-    fetch(`${SCRIPT_URL}?id=${cartridgeId}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.error || !data.material) return;
-        
-        document.getElementById('status-badge').className = "badge badge-found";
-        document.getElementById('status-badge').innerText = "Assigned Cartridge";
-        
-        if (data.location) document.getElementById('location').value = data.location;
-        if (data.material) document.getElementById('material').value = data.material;
-        if (data.size) document.getElementById('size').value = data.size;
-        if (data.thickness) document.getElementById('thickness').value = data.thickness;
-        if (data.quantity !== undefined && data.quantity !== null) {
-          document.getElementById('quantity').value = data.quantity;
-        }
-        if (data.status) setStatus(data.status);
-        if (data.lastUpdated) document.getElementById('last-updated').innerText = "Last updated: " + data.lastUpdated;
-      });
-  }
-
-  document.getElementById('inventory-form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const btn = document.getElementById('save-btn');
-    const msg = document.getElementById('message');
+  /* CAMERA SCANNER LOGIC */
+  function startScanner() {
+    document.getElementById('scanner-modal').style.display = 'block';
+    html5QrCode = new Html5Qrcode("reader");
     
-    btn.disabled = true;
-    btn.innerText = "Updating Sheet...";
-    msg.innerText = "";
-
-    const payload = {
-      cartridgeId: cartridgeId,
-      location: document.getElementById('location').value,
-      material: document.getElementById('material').value,
-      size: document.getElementById('size').value,
-      thickness: document.getElementById('thickness').value,
-      quantity: document.getElementById('quantity').value !== "" ? document.getElementById('quantity').value : "",
-      status: document.getElementById('status').value
-    };
-
-    fetch(SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    })
-    .then(res => res.json())
-    .then(data => {
-      msg.style.color = "#4ade80";
-      msg.innerText = "Saved successfully!";
-      btn.disabled = false;
-      btn.innerText = "Save to Inventory";
-      loadCartridgeData();
-    })
-    .catch(err => {
-      msg.style.color = "#f87171";
-      msg.innerText = "Error updating inventory.";
-      btn.disabled = false;
-      btn.innerText = "Save to Inventory";
-    });
-  });
-
-  /* DASHBOARD FUNCTIONS */
-  function fetchInventory() {
-    fetch(SCRIPT_URL)
-      .then(res => res.json())
-      .then(data => {
-        inventoryData = data;
-        renderDashboard();
-      })
-      .catch(err => {
-        document.getElementById('dashboard-container').innerText = "Error loading inventory data.";
-      });
-  }
-
-  function renderDashboard() {
-    const sortBy = document.getElementById('sort-by').value;
-    const filterStatus = document.getElementById('filter-status').value;
-    const searchQuery = document.getElementById('search-input').value.toLowerCase();
-    const container = document.getElementById('dashboard-container');
-
-    let filtered = inventoryData.filter(item => {
-      const matchesStatus = filterStatus === 'ALL' || item.status === filterStatus;
-      const matchesSearch = !searchQuery || 
-        (item.cartridgeId && item.cartridgeId.toLowerCase().includes(searchQuery)) ||
-        (item.material && item.material.toLowerCase().includes(searchQuery)) ||
-        (item.location && item.location.toLowerCase().includes(searchQuery));
-      return matchesStatus && matchesSearch;
-    });
-
-    if (filtered.length === 0) {
-      container.innerHTML = "<p>No matching cartridges found in inventory.</p>";
-      return;
-    }
-
-    const grouped = {};
-    filtered.forEach(item => {
-      const groupKey = item[sortBy] || "Unassigned";
-      if (!grouped[groupKey]) grouped[groupKey] = [];
-      grouped[groupKey].push(item);
-    });
-
-    let html = '';
-    Object.keys(grouped).sort().forEach(group => {
-      html += `<div class="group-header">${group} (${grouped[group].length})</div>`;
-      html += `<div class="grid">`;
-      
-      grouped[group].forEach(item => {
-        html += `
-          <div class="dash-card">
-            <div class="card-id">${item.cartridgeId}</div>
-            <div class="card-meta">📍 <strong>Location:</strong> ${item.location || 'N/A'}</div>
-            <div class="card-meta">📦 <strong>Material:</strong> ${item.material || 'N/A'}</div>
-            <div class="card-meta">📏 <strong>Size:</strong> ${item.size || 'N/A'} | <strong>Thickness:</strong> ${item.thickness || 'N/A'}</div>
-            <div class="card-meta">🔢 <strong>Qty:</strong> ${item.quantity !== "" ? item.quantity + ' sheets' : 'Not specified'}</div>
-            <div class="status-pill status-${item.status}">${item.status}</div>
-          </div>
-        `;
-      });
-
-      html += `</div>`;
-    });
-
-    container.innerHTML = html;
-  }
-</script>
-
-</body>
-</html>
+    html5QrCode.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 250, height: 250 } },
+      (decodedText) => {
+        // Stop scanner and redirect to scanned URL
+        stopScanner();
+        if (decodedText.includes("?id=")) {
+          window.location.href = decodedText;
+        }
