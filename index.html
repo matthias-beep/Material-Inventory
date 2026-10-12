@@ -189,6 +189,7 @@
   <div id="status-badge" class="badge badge-new">New / Unassigned</div>
 
   <form id="inventory-form">
+    <!-- 1. Building / Rack Location -->
     <label for="location">Building / Rack Location</label>
     <select id="location" required>
       <option value="">-- Select Location --</option>
@@ -204,6 +205,7 @@
       <option value="Outside">Outside</option>
     </select>
 
+    <!-- 2. Material Type -->
     <label for="material">Material Type</label>
     <select id="material" required>
       <option value="">-- Select Material --</option>
@@ -214,6 +216,7 @@
       <option value="Galvanized Steel">Galvanized Steel</option>
     </select>
 
+    <!-- 3. Sheet Dimensions -->
     <label for="size">Sheet Dimensions</label>
     <select id="size" required>
       <option value="">-- Select Dimensions --</option>
@@ -223,33 +226,36 @@
       <option value="Other">Other</option>
     </select>
 
+    <!-- 4. Material Thickness -->
     <label for="thickness">Material Thickness</label>
     <select id="thickness" required>
       <option value="">-- Select Thickness --</option>
       <option value="20ga">20ga</option>
       <option value="18ga">18ga</option>
-      <option value="0.04&quot;">0.04"</option>
-      <option value="0.05&quot;">0.05"</option>
+      <option value='0.04"'>0.04"</option>
+      <option value='0.05"'>0.05"</option>
       <option value="16ga">16ga</option>
       <option value="14ga">14ga</option>
-      <option value="0.09&quot;">0.09"</option>
+      <option value='0.09"'>0.09"</option>
       <option value="11ga">11ga</option>
-      <option value="1/8&quot;">1/8"</option>
+      <option value='1/8"'>1/8"</option>
       <option value="10ga">10ga</option>
-      <option value="3/16&quot;">3/16"</option>
-      <option value="1/4&quot;">1/4"</option>
-      <option value="5/16&quot;">5/16"</option>
-      <option value="3/8&quot;">3/8"</option>
-      <option value="7/16&quot;">7/16"</option>
-      <option value="1/2&quot;">1/2"</option>
-      <option value="5/8&quot;">5/8"</option>
-      <option value="3/4&quot;">3/4"</option>
-      <option value="1&quot;">1"</option>
+      <option value='3/16"'>3/16"</option>
+      <option value='1/4"'>1/4"</option>
+      <option value='5/16"'>5/16"</option>
+      <option value='3/8"'>3/8"</option>
+      <option value='7/16"'>7/16"</option>
+      <option value='1/2"'>1/2"</option>
+      <option value='5/8"'>5/8"</option>
+      <option value='3/4"'>3/4"</option>
+      <option value='1"'>1"</option>
     </select>
 
+    <!-- 5. Sheet Quantity (Optional) -->
     <label for="quantity">Sheet Quantity Remaining <span style="font-weight: normal; font-size: 0.8rem; color: #94a3b8;">(Optional)</span></label>
     <input type="number" id="quantity" min="0" placeholder="e.g. 12">
 
+    <!-- 6. Stock Level Buttons -->
     <label>Stock Level</label>
     <div class="status-group">
       <button type="button" id="btn-Full" class="status-btn selected-Full" onclick="setStatus('Full')">Full</button>
@@ -264,7 +270,6 @@
   </form>
   <a href="/" class="btn-action btn-secondary">View Full Shop Dashboard</a>
 </div>
-
 
 <!-- VIEW 2: SHOP INVENTORY DASHBOARD -->
 <div id="dashboard-view" style="display: none;">
@@ -334,8 +339,213 @@
       { facingMode: "environment" },
       { fps: 10, qrbox: { width: 250, height: 250 } },
       (decodedText) => {
-        // Stop scanner and redirect to scanned URL
         stopScanner();
         if (decodedText.includes("?id=")) {
           window.location.href = decodedText;
+        } else {
+          window.location.href = `/?id=${decodedText}`;
         }
+      },
+      (errorMessage) => { /* scanning... */ }
+    ).catch(err => {
+      alert("Could not access camera. Please check camera permissions.");
+      stopScanner();
+    });
+  }
+
+  function stopScanner() {
+    if (html5QrCode) {
+      html5QrCode.stop().then(() => {
+        document.getElementById('scanner-modal').style.display = 'none';
+      }).catch(err => {
+        document.getElementById('scanner-modal').style.display = 'none';
+      });
+    } else {
+      document.getElementById('scanner-modal').style.display = 'none';
+    }
+  }
+
+  /* CSV EXPORT LOGIC */
+  function exportCSV() {
+    if (!inventoryData || inventoryData.length === 0) {
+      alert("No inventory data to export.");
+      return;
+    }
+
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "Cartridge ID,Location,Material,Dimensions,Thickness,Quantity,Status,Last Updated\n";
+
+    inventoryData.forEach(item => {
+      const row = [
+        `"${item.cartridgeId || ''}"`,
+        `"${item.location || ''}"`,
+        `"${item.material || ''}"`,
+        `"${item.size || ''}"`,
+        `"${item.thickness || ''}"`,
+        `"${item.quantity || ''}"`,
+        `"${item.status || ''}"`,
+        `"${item.lastUpdated || ''}"`
+      ].join(",");
+      csvContent += row + "\n";
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `steel_cartridge_inventory_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  /* SCANNER FORM FUNCTIONS */
+  function setStatus(val) {
+    document.getElementById('status').value = val;
+    ['Full', 'Low', 'Empty'].forEach(s => {
+      const btn = document.getElementById('btn-' + s);
+      if (btn) {
+        btn.className = 'status-btn';
+        if (s === val) btn.classList.add('selected-' + val);
+      }
+    });
+  }
+
+  function loadCartridgeData() {
+    setStatus('Full');
+    fetch(`${SCRIPT_URL}?id=${encodeURIComponent(cartridgeId)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.error || !data.material) return;
+        
+        document.getElementById('status-badge').className = "badge badge-found";
+        document.getElementById('status-badge').innerText = "Assigned Cartridge";
+        
+        if (data.location) document.getElementById('location').value = data.location;
+        if (data.material) document.getElementById('material').value = data.material;
+        if (data.size) document.getElementById('size').value = data.size;
+        if (data.thickness) document.getElementById('thickness').value = data.thickness;
+        if (data.quantity !== undefined && data.quantity !== null) {
+          document.getElementById('quantity').value = data.quantity;
+        }
+        if (data.status) setStatus(data.status);
+        if (data.lastUpdated) document.getElementById('last-updated').innerText = "Last updated: " + data.lastUpdated;
+      })
+      .catch(err => console.error("Error loading cartridge:", err));
+  }
+
+  document.getElementById('inventory-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('save-btn');
+    const msg = document.getElementById('message');
+    
+    btn.disabled = true;
+    btn.innerText = "Updating Sheet...";
+    msg.innerText = "";
+
+    const payload = {
+      cartridgeId: cartridgeId,
+      location: document.getElementById('location').value,
+      material: document.getElementById('material').value,
+      size: document.getElementById('size').value,
+      thickness: document.getElementById('thickness').value,
+      quantity: document.getElementById('quantity').value !== "" ? document.getElementById('quantity').value : "",
+      status: document.getElementById('status').value
+    };
+
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(data => {
+      msg.style.color = "#4ade80";
+      msg.innerText = "Saved successfully!";
+      btn.disabled = false;
+      btn.innerText = "Save to Inventory";
+      loadCartridgeData();
+    })
+    .catch(err => {
+      msg.style.color = "#f87171";
+      msg.innerText = "Error updating inventory.";
+      btn.disabled = false;
+      btn.innerText = "Save to Inventory";
+    });
+  });
+
+  /* DASHBOARD FUNCTIONS */
+  function fetchInventory() {
+    fetch(SCRIPT_URL)
+      .then(res => res.json())
+      .then(data => {
+        inventoryData = data;
+        renderDashboard();
+      })
+      .catch(err => {
+        document.getElementById('dashboard-container').innerText = "Error loading inventory data.";
+      });
+  }
+
+  function renderDashboard() {
+    const sortBy = document.getElementById('sort-by').value;
+    const filterStatus = document.getElementById('filter-status').value;
+    const searchQuery = document.getElementById('search-input').value.toLowerCase();
+    const container = document.getElementById('dashboard-container');
+
+    let filtered = inventoryData.filter(item => {
+      const matchesStatus = filterStatus === 'ALL' || item.status === filterStatus;
+      const matchesSearch = !searchQuery || 
+        (item.cartridgeId && item.cartridgeId.toLowerCase().includes(searchQuery)) ||
+        (item.material && item.material.toLowerCase().includes(searchQuery)) ||
+        (item.location && item.location.toLowerCase().includes(searchQuery));
+      return matchesStatus && matchesSearch;
+    });
+
+    if (filtered.length === 0) {
+      container.innerHTML = "<p>No matching cartridges found in inventory.</p>";
+      return;
+    }
+
+    const grouped = {};
+    filtered.forEach(item => {
+      const groupKey = item[sortBy] || "Unassigned";
+      if (!grouped[groupKey]) grouped[groupKey] = [];
+      grouped[groupKey].push(item);
+    });
+
+    let html = '';
+    Object.keys(grouped).sort().forEach(group => {
+      html += `<div class="group-header">${escapeHtml(group)} (${grouped[group].length})</div>`;
+      html += `<div class="grid">`;
+      
+      grouped[group].forEach(item => {
+        html += `
+          <div class="dash-card">
+            <div class="card-id">${escapeHtml(item.cartridgeId)}</div>
+            <div class="card-meta">📍 <strong>Location:</strong> ${escapeHtml(item.location || 'N/A')}</div>
+            <div class="card-meta">📦 <strong>Material:</strong> ${escapeHtml(item.material || 'N/A')}</div>
+            <div class="card-meta">📏 <strong>Size:</strong> ${escapeHtml(item.size || 'N/A')} | <strong>Thickness:</strong> ${escapeHtml(item.thickness || 'N/A')}</div>
+            <div class="card-meta">🔢 <strong>Qty:</strong> ${item.quantity !== "" ? escapeHtml(item.quantity) + ' sheets' : 'Not specified'}</div>
+            <div class="status-pill status-${escapeHtml(item.status)}">${escapeHtml(item.status)}</div>
+          </div>
+        `;
+      });
+
+      html += `</div>`;
+    });
+
+    container.innerHTML = html;
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+</script>
+
+</body>
+</html>
