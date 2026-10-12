@@ -365,37 +365,50 @@
     }
   }
 
-  /* CSV EXPORT LOGIC */
+  /* FIXED CSV EXPORT LOGIC WITH QUOTE ESCAPING */
   function exportCSV() {
     if (!inventoryData || inventoryData.length === 0) {
       alert("No inventory data to export.");
       return;
     }
 
-    let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "Cartridge ID,Location,Material,Dimensions,Thickness,Quantity,Status,Last Updated\n";
+    const headers = ["Cartridge ID", "Location", "Material", "Dimensions", "Thickness", "Quantity", "Status", "Last Updated"];
+    let csvRows = [headers.map(cleanCsvField).join(",")];
 
     inventoryData.forEach(item => {
       const row = [
-        `"${item.cartridgeId || ''}"`,
-        `"${item.location || ''}"`,
-        `"${item.material || ''}"`,
-        `"${item.size || ''}"`,
-        `"${item.thickness || ''}"`,
-        `"${item.quantity || ''}"`,
-        `"${item.status || ''}"`,
-        `"${item.lastUpdated || ''}"`
-      ].join(",");
-      csvContent += row + "\n";
+        cleanCsvField(item.cartridgeId),
+        cleanCsvField(item.location),
+        cleanCsvField(item.material),
+        cleanCsvField(item.size),
+        cleanCsvField(item.thickness),
+        cleanCsvField(item.quantity !== undefined && item.quantity !== null ? item.quantity : ""),
+        cleanCsvField(item.status),
+        cleanCsvField(item.lastUpdated)
+      ];
+      csvRows.push(row.join(","));
     });
 
-    const encodedUri = encodeURI(csvContent);
+    const csvString = csvRows.join("\n");
+    const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `steel_cartridge_inventory_${new Date().toISOString().slice(0,10)}.csv`);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `steel_inventory_${new Date().toISOString().slice(0,10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  }
+
+  // Helper to escape inner quotes and wrap text safely
+  function cleanCsvField(val) {
+    if (val === null || val === undefined) return '""';
+    let str = String(val).trim();
+    // Escape inner double quotes by doubling them (e.g. 3/8" -> 3/8"")
+    str = str.replace(/"/g, '""');
+    // Wrap in double quotes so commas or gauges don't split columns
+    return `"${str}"`;
   }
 
   /* SCANNER FORM FUNCTIONS */
