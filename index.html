@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Steel Cartridge Manager</title>
+  <title>Steel Cartridge Manager & Dashboard</title>
   <style>
     * { box-sizing: border-box; }
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
       padding: 16px; 
-      max-width: 480px; 
+      max-width: 800px; 
       margin: 0 auto; 
       background: #0f172a; 
       color: #f8fafc;
@@ -20,8 +20,9 @@
       border-radius: 12px; 
       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
       border: 1px solid #334155;
+      margin-bottom: 20px;
     }
-    h2 { margin-top: 0; color: #38bdf8; font-size: 1.4rem; }
+    h2, h1 { margin-top: 0; color: #38bdf8; }
     .badge {
       display: inline-block;
       padding: 4px 10px;
@@ -33,7 +34,7 @@
     .badge-new { background: #0284c7; color: white; }
     .badge-found { background: #16a34a; color: white; }
     label { display: block; margin-top: 14px; font-weight: 600; color: #cbd5e1; font-size: 0.9rem; }
-    select, input[type="number"] { 
+    select, input[type="text"], input[type="number"] { 
       width: 100%; 
       padding: 12px; 
       margin-top: 6px; 
@@ -66,12 +67,11 @@
       user-select: none;
       transition: all 0.2s ease;
     }
-    /* Active Selected States */
     .status-btn.selected-Full { background: #16a34a !important; color: #ffffff !important; border-color: #22c55e !important; }
     .status-btn.selected-Low { background: #eab308 !important; color: #000000 !important; border-color: #facc15 !important; }
     .status-btn.selected-Empty { background: #dc2626 !important; color: #ffffff !important; border-color: #ef4444 !important; }
 
-    button[type="submit"] { 
+    button[type="submit"], .dash-btn { 
       width: 100%; 
       padding: 14px; 
       margin-top: 24px; 
@@ -82,20 +82,68 @@
       font-size: 1.1rem; 
       font-weight: bold; 
       cursor: pointer; 
+      text-align: center;
+      text-decoration: none;
+      display: block;
     }
     button:disabled { background: #475569; cursor: not-allowed; }
     #message { margin-top: 12px; text-align: center; font-weight: bold; }
     .updated-text { font-size: 0.75rem; color: #64748b; margin-top: 12px; text-align: center; }
+
+    /* DASHBOARD STYLES */
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      background: #1e293b;
+      padding: 16px;
+      border-radius: 10px;
+      margin-bottom: 24px;
+      border: 1px solid #334155;
+    }
+    .group-header {
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: #38bdf8;
+      margin-top: 24px;
+      margin-bottom: 12px;
+      border-bottom: 2px solid #334155;
+      padding-bottom: 6px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 16px;
+    }
+    .dash-card {
+      background: #1e293b;
+      border-radius: 10px;
+      padding: 16px;
+      border: 1px solid #334155;
+    }
+    .card-id { font-weight: bold; font-size: 1.1rem; color: #f8fafc; margin-bottom: 6px; }
+    .card-meta { font-size: 0.85rem; color: #cbd5e1; margin: 4px 0; }
+    .status-pill {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: bold;
+      font-size: 0.75rem;
+      margin-top: 8px;
+    }
+    .status-Full { background: #16a34a; color: white; }
+    .status-Low { background: #eab308; color: black; }
+    .status-Empty { background: #dc2626; color: white; }
   </style>
 </head>
 <body>
 
-<div class="card">
+<!-- VIEW 1: SINGLE CARTRIDGE SCANNER FORM -->
+<div id="scanner-view" class="card" style="display: none;">
   <h2 id="cartridge-id">Cartridge Manager</h2>
   <div id="status-badge" class="badge badge-new">New / Unassigned</div>
 
   <form id="inventory-form">
-    <!-- 1. Building / Rack Location -->
     <label for="location">Building / Rack Location</label>
     <select id="location" required>
       <option value="">-- Select Location --</option>
@@ -111,7 +159,6 @@
       <option value="Outside">Outside</option>
     </select>
 
-    <!-- 2. Material Type -->
     <label for="material">Material Type</label>
     <select id="material" required>
       <option value="">-- Select Material --</option>
@@ -122,7 +169,6 @@
       <option value="Galvanized Steel">Galvanized Steel</option>
     </select>
 
-    <!-- 3. Sheet Dimensions -->
     <label for="size">Sheet Dimensions</label>
     <select id="size" required>
       <option value="">-- Select Dimensions --</option>
@@ -132,7 +178,6 @@
       <option value="Other">Other</option>
     </select>
 
-    <!-- 4. Material Thickness -->
     <label for="thickness">Material Thickness</label>
     <select id="thickness" required>
       <option value="">-- Select Thickness --</option>
@@ -157,11 +202,9 @@
       <option value="1&quot;">1"</option>
     </select>
 
-    <!-- 5. Sheet Quantity (Optional) -->
     <label for="quantity">Sheet Quantity Remaining <span style="font-weight: normal; font-size: 0.8rem; color: #94a3b8;">(Optional)</span></label>
     <input type="number" id="quantity" min="0" placeholder="e.g. 12">
 
-    <!-- 6. Stock Level Buttons -->
     <label>Stock Level</label>
     <div class="status-group">
       <button type="button" id="btn-Full" class="status-btn selected-Full" onclick="setStatus('Full')">Full</button>
@@ -170,11 +213,46 @@
     </div>
     <input type="hidden" id="status" value="Full" required>
 
-    <!-- 7. Save Button -->
     <button type="submit" id="save-btn">Save to Inventory</button>
     <div id="message"></div>
     <div class="updated-text" id="last-updated"></div>
   </form>
+  <a href="/" class="dash-btn" style="background: #334155; margin-top: 16px;">View Full Shop Dashboard</a>
+</div>
+
+
+<!-- VIEW 2: SHOP INVENTORY DASHBOARD -->
+<div id="dashboard-view" style="display: none;">
+  <h1>Steel Inventory Dashboard</h1>
+
+  <div class="controls">
+    <div>
+      <label>Group & Sort By</label>
+      <select id="sort-by" onchange="renderDashboard()">
+        <option value="location">Rack Location</option>
+        <option value="material">Material Type</option>
+        <option value="thickness">Thickness / Gauge</option>
+        <option value="size">Sheet Dimensions</option>
+      </select>
+    </div>
+
+    <div>
+      <label>Filter Stock Status</label>
+      <select id="filter-status" onchange="renderDashboard()">
+        <option value="ALL">All Statuses</option>
+        <option value="Full">Full Stock</option>
+        <option value="Low">Low Stock Only</option>
+        <option value="Empty">Empty Only</option>
+      </select>
+    </div>
+
+    <div>
+      <label>Search Cartridges</label>
+      <input type="text" id="search-input" placeholder="e.g. CART-001 or Mild Steel" oninput="renderDashboard()">
+    </div>
+  </div>
+
+  <div id="dashboard-container">Loading inventory data...</div>
 </div>
 
 <script>
@@ -183,23 +261,26 @@
 
   const urlParams = new URLSearchParams(window.location.search);
   const cartridgeId = urlParams.get('id');
+  let inventoryData = [];
 
-  if (!cartridgeId) {
-    document.querySelector('.card').innerHTML = "<h2>No Cartridge ID Found</h2><p>Please scan a valid cartridge QR code.</p>";
-  } else {
+  // ROUTER LOGIC: If ?id= exists, show scanner form; otherwise show dashboard
+  if (cartridgeId) {
+    document.getElementById('scanner-view').style.display = 'block';
     document.getElementById('cartridge-id').innerText = cartridgeId;
     loadCartridgeData();
+  } else {
+    document.getElementById('dashboard-view').style.display = 'block';
+    fetchInventory();
   }
 
+  /* SCANNER FORM FUNCTIONS */
   function setStatus(val) {
     document.getElementById('status').value = val;
     ['Full', 'Low', 'Empty'].forEach(s => {
       const btn = document.getElementById('btn-' + s);
       if (btn) {
         btn.className = 'status-btn';
-        if (s === val) {
-          btn.classList.add('selected-' + val);
-        }
+        if (s === val) btn.classList.add('selected-' + val);
       }
     });
   }
@@ -223,8 +304,7 @@
         }
         if (data.status) setStatus(data.status);
         if (data.lastUpdated) document.getElementById('last-updated').innerText = "Last updated: " + data.lastUpdated;
-      })
-      .catch(err => console.error("Could not fetch data:", err));
+      });
   }
 
   document.getElementById('inventory-form').addEventListener('submit', function(e) {
@@ -265,6 +345,70 @@
       btn.innerText = "Save to Inventory";
     });
   });
+
+  /* DASHBOARD FUNCTIONS */
+  function fetchInventory() {
+    fetch(SCRIPT_URL)
+      .then(res => res.json())
+      .then(data => {
+        inventoryData = data;
+        renderDashboard();
+      })
+      .catch(err => {
+        document.getElementById('dashboard-container').innerText = "Error loading inventory data.";
+      });
+  }
+
+  function renderDashboard() {
+    const sortBy = document.getElementById('sort-by').value;
+    const filterStatus = document.getElementById('filter-status').value;
+    const searchQuery = document.getElementById('search-input').value.toLowerCase();
+    const container = document.getElementById('dashboard-container');
+
+    let filtered = inventoryData.filter(item => {
+      const matchesStatus = filterStatus === 'ALL' || item.status === filterStatus;
+      const matchesSearch = !searchQuery || 
+        (item.cartridgeId && item.cartridgeId.toLowerCase().includes(searchQuery)) ||
+        (item.material && item.material.toLowerCase().includes(searchQuery)) ||
+        (item.location && item.location.toLowerCase().includes(searchQuery));
+      return matchesStatus && matchesSearch;
+    });
+
+    if (filtered.length === 0) {
+      container.innerHTML = "<p>No matching cartridges found in inventory.</p>";
+      return;
+    }
+
+    const grouped = {};
+    filtered.forEach(item => {
+      const groupKey = item[sortBy] || "Unassigned";
+      if (!grouped[groupKey]) grouped[groupKey] = [];
+      grouped[groupKey].push(item);
+    });
+
+    let html = '';
+    Object.keys(grouped).sort().forEach(group => {
+      html += `<div class="group-header">${group} (${grouped[group].length})</div>`;
+      html += `<div class="grid">`;
+      
+      grouped[group].forEach(item => {
+        html += `
+          <div class="dash-card">
+            <div class="card-id">${item.cartridgeId}</div>
+            <div class="card-meta">📍 <strong>Location:</strong> ${item.location || 'N/A'}</div>
+            <div class="card-meta">📦 <strong>Material:</strong> ${item.material || 'N/A'}</div>
+            <div class="card-meta">📏 <strong>Size:</strong> ${item.size || 'N/A'} | <strong>Thickness:</strong> ${item.thickness || 'N/A'}</div>
+            <div class="card-meta">🔢 <strong>Qty:</strong> ${item.quantity !== "" ? item.quantity + ' sheets' : 'Not specified'}</div>
+            <div class="status-pill status-${item.status}">${item.status}</div>
+          </div>
+        `;
+      });
+
+      html += `</div>`;
+    });
+
+    container.innerHTML = html;
+  }
 </script>
 
 </body>
